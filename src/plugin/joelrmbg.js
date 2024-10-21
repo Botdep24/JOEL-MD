@@ -19996,116 +19996,58 @@
 
 
 
-
+import path from 'path';
+import fs from 'fs';
+import { v4 as uuidv4 } from 'uuid';
+import { removeBackgroundFromImageFile } from 'remove.bg';
 import config from '../../config.cjs';
-import pkg, { prepareWAMessageMedia } from '@whiskeysockets/baileys';
-import Jimp from 'jimp';
-const { generateWAMessageFromContent, proto } = pkg;
 
-const alive = async (m, Matrix) => {
-  const uptimeSeconds = process.uptime();
-  const days = Math.floor(uptimeSeconds / (3600 * 24));
-  const hours = Math.floor((uptimeSeconds % (3600 * 24)) / 3600);
-  const minutes = Math.floor((uptimeSeconds % 3600) / 60);
-  const seconds = Math.floor(uptimeSeconds % 60);
-  const timeString = `${String(days).padStart(2, '0')}-${String(hours).padStart(2, '0')}-${String(minutes).padStart(2, '0')}-${String(seconds).padStart(2, '0')}`;
+const tourl = async (m, gss) => {
   const prefix = config.PREFIX;
-  const cmd = m.body.startsWith(prefix) ? m.body.slice(prefix.length).split(' ')[0].toLowerCase() : '';
-  const text = m.body.slice(prefix.length + cmd.length).trim();
+const cmd = m.body.startsWith(prefix) ? m.body.slice(prefix.length).split(' ')[0].toLowerCase() : '';
+const text = m.body.slice(prefix.length + cmd.length).trim();
 
-  if (['channel', 'support', 'bot'].includes(cmd)) {
-    const width = 800;
-    const height = 500;
-    const image = new Jimp(width, height, 'black');
-    const font = await Jimp.loadFont(Jimp.FONT_SANS_128_WHITE);
-    const textMetrics = Jimp.measureText(font, timeString);
-    const textHeight = Jimp.measureTextHeight(font, timeString, width);
-    const x = (width / 2) - (textMetrics / 2);
-    const y = (height / 2) - (textHeight / 2);
-    image.print(font, x, y, timeString, width, Jimp.HORIZONTAL_ALIGN_CENTER | Jimp.VERTICAL_ALIGN_MIDDLE);
-    const buffer = await image.getBufferAsync(Jimp.MIME_PNG);
-    
-    const uptimeMessage = `┏━━━━❐
-┃『ᴊᴏᴇʟ ᴍᴅ ʙᴏᴛ』
-┗
-┏
-┃『ᴡᴀ ᴄʜᴀɴɴᴇʟ』
-┃❑ https://whatsapp.com/channel/0029Vade9VgD38CPEnxfYF0M
-┗
-┏
-┃『ᴡᴀ ɢʀᴏᴜᴘ 』
-┃❐ https://chat.whatsapp.com/GxlcVwkXrPo2YwNoQI5TwS
-┗
-┏
-┃『ʏᴏᴜ ᴛᴜʙᴇ 』
-┃❐https://youtube.com/@joeltech255?si=rqhYlAhFtqK7CVX2
-┗
-┏
-┃『ᴛɪᴋᴛᴏᴋ 』
-┃❐https://www.tiktok.com/@joeljamestech
-┗━━━━━━━━━━━━━━━━━━❑
-ᴋᴇᴇᴘ ᴜsɪɴɢ ᴊᴏᴇʟ ᴍᴅ ʙᴏᴛ`;
-    
-    const buttons = [
-      {
-        "name": "quick_reply",
-        "buttonParamsJson": JSON.stringify({
-          display_text: "SCRIPT",
-          id: `${prefix}repo`
-        })
-      },
-      {
-        "name": "quick_reply",
-        "buttonParamsJson": JSON.stringify({
-          display_text: "PING",
-          id: `${prefix}ping`
-        })
-      }
+  const validCommands = ['removebg', 'nobg'];
+
+  if (validCommands.includes(cmd)) {
+    const apiKeys = [
+      'q61faXzzR5zNU6cvcrwtUkRU', 'S258diZhcuFJooAtHTaPEn4T',
+      '5LjfCVAp4vVNYiTjq9mXJWHF', 'aT7ibfUsGSwFyjaPZ9eoJc61',
+      'BY63t7Vx2tS68YZFY6AJ4HHF', '5Gdq1sSWSeyZzPMHqz7ENfi8',
+      '86h6d6u4AXrst4BVMD9dzdGZ', 'xp8pSDavAgfE5XScqXo9UKHF',
+      'dWbCoCb3TacCP93imNEcPxcL'
     ];
+    const apiKey = apiKeys[Math.floor(Math.random() * apiKeys.length)];
 
-    const msg = generateWAMessageFromContent(m.from, {
-      viewOnceMessage: {
-        message: {
-          messageContextInfo: {
-            deviceListMetadata: {},
-            deviceListMetadataVersion: 2
-          },
-          interactiveMessage: proto.Message.InteractiveMessage.create({
-            body: proto.Message.InteractiveMessage.Body.create({
-              text: uptimeMessage
-            }),
-            footer: proto.Message.InteractiveMessage.Footer.create({
-              text: "ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴊᴏᴇʟ ᴋᴀɴɢ'ᴏᴍᴀ"
-            }),
-            header: proto.Message.InteractiveMessage.Header.create({
-              ...(await prepareWAMessageMedia({ image: buffer }, { upload: Matrix.waUploadToServer })),
-              title: ``,
-              gifPlayback: false,
-              subtitle: "",
-              hasMediaAttachment: false
-            }),
-            nativeFlowMessage: proto.Message.InteractiveMessage.NativeFlowMessage.create({
-              buttons
-            }),
-            contextInfo: {
-              quotedMessage: m.message,
-              forwardingScore: 999,
-              isForwarded: true,
-              forwardedNewsletterMessageInfo: {
-                newsletterJid: '255714595078@s.whatsapp.net',
-                newsletterName: "JOel",
-                serverMessageId: 143
-              }
-            }
-          }),
-        },
-      },
-    }, {});
+    if (!m.quoted || m.quoted.mtype !== 'imageMessage') {
+      return m.reply(`> Send/Reply with an image for remove you picture backgroud\n*Example ${prefix + cmd}*`);
+    }
 
-    await Matrix.relayMessage(msg.key.remoteJid, msg.message, {
-      messageId: msg.key.id
+    const localFilePath = `./src/remobg-${uuidv4()}`;
+    const outputFilePath = `./src/hremo-${uuidv4()}.png`;
+    const media = await m.quoted.download();
+
+    fs.writeFileSync(localFilePath, media);
+
+    m.reply('Processing...');
+
+    removeBackgroundFromImageFile({
+      path: localFilePath,
+      apiKey,
+      size: 'regular',
+      type: 'auto',
+      scale: '100%',
+      outputFile: outputFilePath
+    }).then(async () => {
+      gss.sendMessage(m.from, { image: fs.readFileSync(outputFilePath), caption: `> Hey ${m.pushName} Your picture Background Romoved Sucessfully` }, { quoted: m });
+      fs.unlinkSync(localFilePath);
+      fs.unlinkSync(outputFilePath);
+    }).catch(error => {
+      console.error('Error processing image:', error);
+      m.reply('There was an error processing the image.');
+      fs.unlinkSync(localFilePath);
     });
   }
 };
 
-export default alive;
+export default tourl;

@@ -19997,115 +19997,80 @@
 
 
 
+import fs from 'fs-extra';
 import config from '../../config.cjs';
-import pkg, { prepareWAMessageMedia } from '@whiskeysockets/baileys';
-import Jimp from 'jimp';
-const { generateWAMessageFromContent, proto } = pkg;
 
-const alive = async (m, Matrix) => {
-  const uptimeSeconds = process.uptime();
-  const days = Math.floor(uptimeSeconds / (3600 * 24));
-  const hours = Math.floor((uptimeSeconds % (3600 * 24)) / 3600);
-  const minutes = Math.floor((uptimeSeconds % 3600) / 60);
-  const seconds = Math.floor(uptimeSeconds % 60);
-  const timeString = `${String(days).padStart(2, '0')}-${String(hours).padStart(2, '0')}-${String(minutes).padStart(2, '0')}-${String(seconds).padStart(2, '0')}`;
+const stickerCommand = async (m, gss) => {
   const prefix = config.PREFIX;
   const cmd = m.body.startsWith(prefix) ? m.body.slice(prefix.length).split(' ')[0].toLowerCase() : '';
   const text = m.body.slice(prefix.length + cmd.length).trim();
 
-  if (['channel', 'support', 'bot'].includes(cmd)) {
-    const width = 800;
-    const height = 500;
-    const image = new Jimp(width, height, 'black');
-    const font = await Jimp.loadFont(Jimp.FONT_SANS_128_WHITE);
-    const textMetrics = Jimp.measureText(font, timeString);
-    const textHeight = Jimp.measureTextHeight(font, timeString, width);
-    const x = (width / 2) - (textMetrics / 2);
-    const y = (height / 2) - (textHeight / 2);
-    image.print(font, x, y, timeString, width, Jimp.HORIZONTAL_ALIGN_CENTER | Jimp.VERTICAL_ALIGN_MIDDLE);
-    const buffer = await image.getBufferAsync(Jimp.MIME_PNG);
-    
-    const uptimeMessage = `┏━━━━❐
-┃『ᴊᴏᴇʟ ᴍᴅ ʙᴏᴛ』
-┗
-┏
-┃『ᴡᴀ ᴄʜᴀɴɴᴇʟ』
-┃❑ https://whatsapp.com/channel/0029Vade9VgD38CPEnxfYF0M
-┗
-┏
-┃『ᴡᴀ ɢʀᴏᴜᴘ 』
-┃❐ https://chat.whatsapp.com/GxlcVwkXrPo2YwNoQI5TwS
-┗
-┏
-┃『ʏᴏᴜ ᴛᴜʙᴇ 』
-┃❐https://youtube.com/@joeltech255?si=rqhYlAhFtqK7CVX2
-┗
-┏
-┃『ᴛɪᴋᴛᴏᴋ 』
-┃❐https://www.tiktok.com/@joeljamestech
-┗━━━━━━━━━━━━━━━━━━❑
-ᴋᴇᴇᴘ ᴜsɪɴɢ ᴊᴏᴇʟ ᴍᴅ ʙᴏᴛ`;
-    
-    const buttons = [
-      {
-        "name": "quick_reply",
-        "buttonParamsJson": JSON.stringify({
-          display_text: "SCRIPT",
-          id: `${prefix}repo`
-        })
-      },
-      {
-        "name": "quick_reply",
-        "buttonParamsJson": JSON.stringify({
-          display_text: "PING",
-          id: `${prefix}ping`
-        })
+  const packname = global.packname || "Mercedes";
+  const author = global.author || "🥵💫👿";
+
+  const validCommands = ['sticker', 's', 'autosticker'];
+
+  const arg = text.split(' ')[0];
+
+  if (cmd === 'autosticker') {
+    if (arg === 'on') {
+      config.AUTO_STICKER = true;
+      await m.reply('Auto-sticker is now enabled.');
+    } else if (arg === 'off') {
+      config.AUTO_STICKER = false;
+      await m.reply('Auto-sticker is now disabled.');
+    } else {
+      await m.reply('Usage: /autosticker on|off');
+    }
+    return;
+  }
+
+  if (config.AUTO_STICKER && !m.key.fromMe) {
+    if (m.type === 'imageMessage') {
+      let media = await m.download();
+      if (media) {
+        await gss.sendImageAsSticker(m.from, media, m, { packname, author });
+        console.log('Auto sticker sent');
+      } else {
+        console.error('Failed to download media for auto-sticker.');
       }
-    ];
+      return;
+    } else if (m.type === 'videoMessage' && m.msg.seconds <= 11) {
+      let media = await m.download();
+      if (media) {
+        await gss.sendVideoAsSticker(m.from, media, m, { packname, author });
+      } else {
+        console.error('Failed to download video for auto-sticker.');
+      }
+      return;
+    }
+  }
 
-    const msg = generateWAMessageFromContent(m.from, {
-      viewOnceMessage: {
-        message: {
-          messageContextInfo: {
-            deviceListMetadata: {},
-            deviceListMetadataVersion: 2
-          },
-          interactiveMessage: proto.Message.InteractiveMessage.create({
-            body: proto.Message.InteractiveMessage.Body.create({
-              text: uptimeMessage
-            }),
-            footer: proto.Message.InteractiveMessage.Footer.create({
-              text: "ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴊᴏᴇʟ ᴋᴀɴɢ'ᴏᴍᴀ"
-            }),
-            header: proto.Message.InteractiveMessage.Header.create({
-              ...(await prepareWAMessageMedia({ image: buffer }, { upload: Matrix.waUploadToServer })),
-              title: ``,
-              gifPlayback: false,
-              subtitle: "",
-              hasMediaAttachment: false
-            }),
-            nativeFlowMessage: proto.Message.InteractiveMessage.NativeFlowMessage.create({
-              buttons
-            }),
-            contextInfo: {
-              quotedMessage: m.message,
-              forwardingScore: 999,
-              isForwarded: true,
-              forwardedNewsletterMessageInfo: {
-                newsletterJid: '255714595078@s.whatsapp.net',
-                newsletterName: "JOel",
-                serverMessageId: 143
-              }
-            }
-          }),
-        },
-      },
-    }, {});
+  if (validCommands.includes(cmd)) {
+    const quoted = m.quoted || {};
 
-    await Matrix.relayMessage(msg.key.remoteJid, msg.message, {
-      messageId: msg.key.id
-    });
+    if (!quoted || (quoted.mtype !== 'imageMessage' && quoted.mtype !== 'videoMessage')) {
+      return m.reply(`Send/Reply with an image or video to convert into a sticker using ${prefix + cmd}`);
+    }
+
+    try {
+      const media = await quoted.download();
+      if (!media) throw new Error('Failed to download media.');
+      if (quoted.mtype === 'imageMessage') {
+        await gss.sendImageAsSticker(m.from, media, m, { packname, author });
+        m.reply('Sticker created successfully!');
+      }
+      else if (quoted.mtype === 'videoMessage' && quoted.msg.seconds <= 11) {
+        await gss.sendVideoAsSticker(m.from, media, m, { packname, author });
+        m.reply('Sticker created successfully!');
+      } else {
+        m.reply('Video too long. Please send a video that is less than 11 seconds.');
+      }
+    } catch (error) {
+      console.error(error);
+      m.reply(`Error: ${error.message}`);
+    }
   }
 };
 
-export default alive;
+export default stickerCommand;

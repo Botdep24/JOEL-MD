@@ -19997,115 +19997,126 @@
 
 
 
+import { UploadFileUgu, TelegraPh } from '../uploader.js';
+import { writeFile, unlink } from 'fs/promises';
 import config from '../../config.cjs';
-import pkg, { prepareWAMessageMedia } from '@whiskeysockets/baileys';
-import Jimp from 'jimp';
-const { generateWAMessageFromContent, proto } = pkg;
+const MAX_FILE_SIZE_MB = 60;
 
-const alive = async (m, Matrix) => {
-  const uptimeSeconds = process.uptime();
-  const days = Math.floor(uptimeSeconds / (3600 * 24));
-  const hours = Math.floor((uptimeSeconds % (3600 * 24)) / 3600);
-  const minutes = Math.floor((uptimeSeconds % 3600) / 60);
-  const seconds = Math.floor(uptimeSeconds % 60);
-  const timeString = `${String(days).padStart(2, '0')}-${String(hours).padStart(2, '0')}-${String(minutes).padStart(2, '0')}-${String(seconds).padStart(2, '0')}`;
+const tourl = async (m, gss) => {
   const prefix = config.PREFIX;
-  const cmd = m.body.startsWith(prefix) ? m.body.slice(prefix.length).split(' ')[0].toLowerCase() : '';
-  const text = m.body.slice(prefix.length + cmd.length).trim();
+const cmd = m.body.startsWith(prefix) ? m.body.slice(prefix.length).split(' ')[0].toLowerCase() : '';
+const text = m.body.slice(prefix.length + cmd.length).trim();
+  const validCommands = ['tourl', 'url'];
 
-  if (['channel', 'support', 'bot'].includes(cmd)) {
-    const width = 800;
-    const height = 500;
-    const image = new Jimp(width, height, 'black');
-    const font = await Jimp.loadFont(Jimp.FONT_SANS_128_WHITE);
-    const textMetrics = Jimp.measureText(font, timeString);
-    const textHeight = Jimp.measureTextHeight(font, timeString, width);
-    const x = (width / 2) - (textMetrics / 2);
-    const y = (height / 2) - (textHeight / 2);
-    image.print(font, x, y, timeString, width, Jimp.HORIZONTAL_ALIGN_CENTER | Jimp.VERTICAL_ALIGN_MIDDLE);
-    const buffer = await image.getBufferAsync(Jimp.MIME_PNG);
-    
-    const uptimeMessage = `┏━━━━❐
-┃『ᴊᴏᴇʟ ᴍᴅ ʙᴏᴛ』
-┗
-┏
-┃『ᴡᴀ ᴄʜᴀɴɴᴇʟ』
-┃❑ https://whatsapp.com/channel/0029Vade9VgD38CPEnxfYF0M
-┗
-┏
-┃『ᴡᴀ ɢʀᴏᴜᴘ 』
-┃❐ https://chat.whatsapp.com/GxlcVwkXrPo2YwNoQI5TwS
-┗
-┏
-┃『ʏᴏᴜ ᴛᴜʙᴇ 』
-┃❐https://youtube.com/@joeltech255?si=rqhYlAhFtqK7CVX2
-┗
-┏
-┃『ᴛɪᴋᴛᴏᴋ 』
-┃❐https://www.tiktok.com/@joeljamestech
-┗━━━━━━━━━━━━━━━━━━❑
-ᴋᴇᴇᴘ ᴜsɪɴɢ ᴊᴏᴇʟ ᴍᴅ ʙᴏᴛ`;
-    
-    const buttons = [
-      {
-        "name": "quick_reply",
-        "buttonParamsJson": JSON.stringify({
-          display_text: "SCRIPT",
-          id: `${prefix}repo`
-        })
-      },
-      {
-        "name": "quick_reply",
-        "buttonParamsJson": JSON.stringify({
-          display_text: "PING",
-          id: `${prefix}ping`
-        })
-      }
-    ];
+  if (validCommands.includes(cmd)) {
+    if (!m.quoted || !['imageMessage', 'videoMessage', 'audioMessage'].includes(m.quoted.mtype)) {
+      return m.reply(`Send/Reply with an image, video, or audio to upload ${prefix + cmd}`);
+    }
 
-    const msg = generateWAMessageFromContent(m.from, {
-      viewOnceMessage: {
-        message: {
-          messageContextInfo: {
-            deviceListMetadata: {},
-            deviceListMetadataVersion: 2
+    try {
+      const loadingMessages = [
+        "*「▰▰▰▱▱▱▱▱▱▱」*",
+        "*「▰▰▰▰▱▱▱▱▱▱」*",
+        "*「▰▰▰▰▰▱▱▱▱▱」*",
+        "*「▰▰▰▰▰▰▱▱▱▱」*",
+        "*「▰▰▰▰▰▰▰▱▱▱」*",
+        "*「▰▰▰▰▰▰▰▰▱▱」*",
+        "*「▰▰▰▰▰▰▰▰▰▱」*",
+        "*「▰▰▰▰▰▰▰▰▰▰」*",
+      ];
+
+      const loadingMessageCount = loadingMessages.length;
+      let currentMessageIndex = 0;
+
+      const { key } = await gss.sendMessage(m.from, { text: loadingMessages[currentMessageIndex] }, { quoted: m });
+
+      const loadingInterval = setInterval(() => {
+        currentMessageIndex = (currentMessageIndex + 1) % loadingMessageCount;
+        gss.relayMessage(m.from, {
+          protocolMessage: {
+            key: key,
+            type: 14,
+            editedMessage: {
+              conversation: loadingMessages[currentMessageIndex],
+            },
           },
-          interactiveMessage: proto.Message.InteractiveMessage.create({
-            body: proto.Message.InteractiveMessage.Body.create({
-              text: uptimeMessage
-            }),
-            footer: proto.Message.InteractiveMessage.Footer.create({
-              text: "ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴊᴏᴇʟ ᴋᴀɴɢ'ᴏᴍᴀ"
-            }),
-            header: proto.Message.InteractiveMessage.Header.create({
-              ...(await prepareWAMessageMedia({ image: buffer }, { upload: Matrix.waUploadToServer })),
-              title: ``,
-              gifPlayback: false,
-              subtitle: "",
-              hasMediaAttachment: false
-            }),
-            nativeFlowMessage: proto.Message.InteractiveMessage.NativeFlowMessage.create({
-              buttons
-            }),
-            contextInfo: {
-              quotedMessage: m.message,
-              forwardingScore: 999,
-              isForwarded: true,
-              forwardedNewsletterMessageInfo: {
-                newsletterJid: '255714595078@s.whatsapp.net',
-                newsletterName: "JOel",
-                serverMessageId: 143
-              }
-            }
-          }),
-        },
-      },
-    }, {});
+        }, {});
+      }, 500);
 
-    await Matrix.relayMessage(msg.key.remoteJid, msg.message, {
-      messageId: msg.key.id
-    });
+      const media = await m.quoted.download(); // Download the media from the quoted message
+      if (!media) throw new Error('Failed to download media.');
+
+      const fileSizeMB = media.length / (1024 * 1024); // Calculate file size in megabytes
+      if (fileSizeMB > MAX_FILE_SIZE_MB) {
+        clearInterval(loadingInterval);
+        return m.reply(`File size exceeds the limit of ${MAX_FILE_SIZE_MB}MB.`);
+      }
+
+      const extension = getFileExtension(m.quoted.mtype);
+      if (!extension) throw new Error('Unknown media type.');
+
+      const filePath = `./${Date.now()}.${extension}`; // Save the media with proper extension
+      await writeFile(filePath, media);
+
+      let response;
+      if (m.quoted.mtype === 'imageMessage') {
+        response = await TelegraPh(filePath); // Pass the file path to TelegraPh
+      } else {
+        response = await UploadFileUgu(filePath); // Pass the file path to UploadFileUgu
+      }
+
+      clearInterval(loadingInterval);
+
+      // Replace loading animation with "Loading complete" message
+      await gss.relayMessage(m.from, {
+        protocolMessage: {
+          key: key,
+          type: 14,
+          editedMessage: {
+            conversation: '✅ Loading complete.',
+          },
+        },
+      }, {});
+
+      const mediaUrl = response.url || response; // Extract the URL from the response
+
+      // Only send the URL as a reply
+      await m.reply(`*Hey ${m.pushName} Here Is Your Media*\n*url:* ${mediaUrl}`);
+
+      await unlink(filePath); // Delete the downloaded media file
+    } catch (error) {
+      console.error('Error processing media:', error);
+      m.reply('Error processing media.');
+    }
   }
 };
 
-export default alive;
+// Function to get the file extension based on media type
+const getFileExtension = (mtype) => {
+  switch (mtype) {
+    case 'imageMessage':
+      return 'jpg';
+    case 'videoMessage':
+      return 'mp4';
+    case 'audioMessage':
+      return 'mp3';
+    default:
+      return null;
+  }
+};
+
+// Function to get the media type for messaging
+const getMediaType = (mtype) => {
+  switch (mtype) {
+    case 'imageMessage':
+      return 'image';
+    case 'videoMessage':
+      return 'video';
+    case 'audioMessage':
+      return 'audio';
+    default:
+      return null;
+  }
+};
+
+export default tourl;

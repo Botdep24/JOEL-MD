@@ -19998,114 +19998,46 @@
 
 
 import config from '../../config.cjs';
-import pkg, { prepareWAMessageMedia } from '@whiskeysockets/baileys';
-import Jimp from 'jimp';
-const { generateWAMessageFromContent, proto } = pkg;
 
-const alive = async (m, Matrix) => {
-  const uptimeSeconds = process.uptime();
-  const days = Math.floor(uptimeSeconds / (3600 * 24));
-  const hours = Math.floor((uptimeSeconds % (3600 * 24)) / 3600);
-  const minutes = Math.floor((uptimeSeconds % 3600) / 60);
-  const seconds = Math.floor(uptimeSeconds % 60);
-  const timeString = `${String(days).padStart(2, '0')}-${String(hours).padStart(2, '0')}-${String(minutes).padStart(2, '0')}-${String(seconds).padStart(2, '0')}`;
-  const prefix = config.PREFIX;
-  const cmd = m.body.startsWith(prefix) ? m.body.slice(prefix.length).split(' ')[0].toLowerCase() : '';
-  const text = m.body.slice(prefix.length + cmd.length).trim();
+const joinGroup = async (m, gss) => {
+  try {
+    const botNumber = await gss.decodeJid(gss.user.id);
+  const isCreator = [botNumber, config.OWNER_NUMBER + '@s.whatsapp.net'].includes(m.sender);
+    const prefix = config.PREFIX;
+const cmd = m.body.startsWith(prefix) ? m.body.slice(prefix.length).split(' ')[0].toLowerCase() : '';
+const text = m.body.slice(prefix.length + cmd.length).trim();
+    const args = text.split(' ');
 
-  if (['channel', 'support', 'bot'].includes(cmd)) {
-    const width = 800;
-    const height = 500;
-    const image = new Jimp(width, height, 'black');
-    const font = await Jimp.loadFont(Jimp.FONT_SANS_128_WHITE);
-    const textMetrics = Jimp.measureText(font, timeString);
-    const textHeight = Jimp.measureTextHeight(font, timeString, width);
-    const x = (width / 2) - (textMetrics / 2);
-    const y = (height / 2) - (textHeight / 2);
-    image.print(font, x, y, timeString, width, Jimp.HORIZONTAL_ALIGN_CENTER | Jimp.VERTICAL_ALIGN_MIDDLE);
-    const buffer = await image.getBufferAsync(Jimp.MIME_PNG);
+    const validCommands = ['join'];
+
+    if (!validCommands.includes(cmd)) return;
     
-    const uptimeMessage = `┏━━━━❐
-┃『ᴊᴏᴇʟ ᴍᴅ ʙᴏᴛ』
-┗
-┏
-┃『ᴡᴀ ᴄʜᴀɴɴᴇʟ』
-┃❑ https://whatsapp.com/channel/0029Vade9VgD38CPEnxfYF0M
-┗
-┏
-┃『ᴡᴀ ɢʀᴏᴜᴘ 』
-┃❐ https://chat.whatsapp.com/GxlcVwkXrPo2YwNoQI5TwS
-┗
-┏
-┃『ʏᴏᴜ ᴛᴜʙᴇ 』
-┃❐https://youtube.com/@joeltech255?si=rqhYlAhFtqK7CVX2
-┗
-┏
-┃『ᴛɪᴋᴛᴏᴋ 』
-┃❐https://www.tiktok.com/@joeljamestech
-┗━━━━━━━━━━━━━━━━━━❑
-ᴋᴇᴇᴘ ᴜsɪɴɢ ᴊᴏᴇʟ ᴍᴅ ʙᴏᴛ`;
     
-    const buttons = [
-      {
-        "name": "quick_reply",
-        "buttonParamsJson": JSON.stringify({
-          display_text: "SCRIPT",
-          id: `${prefix}repo`
-        })
-      },
-      {
-        "name": "quick_reply",
-        "buttonParamsJson": JSON.stringify({
-          display_text: "PING",
-          id: `${prefix}ping`
-        })
-      }
-    ];
 
-    const msg = generateWAMessageFromContent(m.from, {
-      viewOnceMessage: {
-        message: {
-          messageContextInfo: {
-            deviceListMetadata: {},
-            deviceListMetadataVersion: 2
-          },
-          interactiveMessage: proto.Message.InteractiveMessage.create({
-            body: proto.Message.InteractiveMessage.Body.create({
-              text: uptimeMessage
-            }),
-            footer: proto.Message.InteractiveMessage.Footer.create({
-              text: "ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴊᴏᴇʟ ᴋᴀɴɢ'ᴏᴍᴀ"
-            }),
-            header: proto.Message.InteractiveMessage.Header.create({
-              ...(await prepareWAMessageMedia({ image: buffer }, { upload: Matrix.waUploadToServer })),
-              title: ``,
-              gifPlayback: false,
-              subtitle: "",
-              hasMediaAttachment: false
-            }),
-            nativeFlowMessage: proto.Message.InteractiveMessage.NativeFlowMessage.create({
-              buttons
-            }),
-            contextInfo: {
-              quotedMessage: m.message,
-              forwardingScore: 999,
-              isForwarded: true,
-              forwardedNewsletterMessageInfo: {
-                newsletterJid: '255714595078@s.whatsapp.net',
-                newsletterName: "JOel",
-                serverMessageId: 143
-              }
-            }
-          }),
-        },
-      },
-    }, {});
+    if (!isCreator) return m.reply("*📛 THIS IS AN OWNER COMMAND*");
 
-    await Matrix.relayMessage(msg.key.remoteJid, msg.message, {
-      messageId: msg.key.id
-    });
+    if (!text) throw '*Enter The Group Link!*';
+    if (!isUrl(args[0]) && !args[0].includes('whatsapp.com')) throw '*INVALID LINK!*';
+
+    m.reply('Please wait...');
+    const result = args[0].split('https://chat.whatsapp.com/')[1];
+
+    await gss.groupAcceptInvite(result)
+      .then((res) => m.reply(`*📛 SUCCESSFULLY JOINED THE GROUP. ${JSON.stringify(res)}`))
+      .catch((err) => m.reply(`*🚫 FAILED TO JOIN THE GROUP. ${JSON.stringify(err)}`));
+  } catch (error) {
+    console.error('Error:', error);
+    m.reply('An error occurred while processing the command.');
   }
 };
 
-export default alive;
+const isUrl = (string) => {
+  try {
+    new URL(string);
+    return true;
+  } catch (_) {
+    return false;
+  }
+};
+
+export default joinGroup;
